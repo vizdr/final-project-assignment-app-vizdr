@@ -2,7 +2,7 @@
 
 This is the application part of the final [project](https://github.com/cu-ecen-aeld/final-project-vizdr) for Specialization Advanced Embedded Linux Development cu-ecen-aeld ECEA - 5307
 
-One can found links on Yocto repo from the link above.
+One can find links on Yocto repos and additional info [here](https://github.com/cu-ecen-aeld/final-project-vizdr).
 
 ## Wiki
 
