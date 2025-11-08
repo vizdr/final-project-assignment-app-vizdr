@@ -1,6 +1,12 @@
 ## final-project-assignment-app-vizdr
 
-application part of the final [project](https://github.com/cu-ecen-aeld/final-project-vizdr) for Specialization Advanced Embedded Linux Development cu-ecen-aeld ECEA - 5307
+It is the application part of the final [project](https://github.com/cu-ecen-aeld/final-project-vizdr) for Specialization Advanced Embedded Linux Development cu-ecen-aeld ECEA - 5307
+
+One can found links on Yocto repo from the link above.
+
+## Wiki
+
+Wiki page of the entire progect can be found [here](https://github.com/cu-ecen-aeld/final-project-vizdr/wiki)
 
 ## Schedule Page
 
