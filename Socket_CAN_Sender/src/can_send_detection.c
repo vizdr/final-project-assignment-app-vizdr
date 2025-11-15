@@ -1,15 +1,18 @@
 // can_send_detection.c
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
+#include <unistd.h>
 #include <errno.h>
-#include <fcntl.h>
+
+#include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/ioctl.h>   // <-- needed for ioctl()
+#include <net/if.h>      // <-- needed for struct ifreq
+
 #include <linux/can.h>
 #include <linux/can/raw.h>
-#include <net/if.h>
-#include <sys/ioctl.h>
+
 
 #define FILE_PATH "/var/tmp/audio_detection"
 #define CAN_INTERFACE "can0"
@@ -20,7 +23,7 @@ int main()
 {
     int sock;
     struct sockaddr_can addr;
-    unsigned int ifindex;
+    struct ifreq ifr;
     struct can_frame frame;
 
     // --- Open CAN socket ---
@@ -29,16 +32,16 @@ int main()
         return 1;
     }
 
-    ifindex = if_nametoindex(CAN_INTERFACE);
-    if (ifindex == 0) {
-        perror("if_nametoindex failed");
+    strcpy(ifr.ifr_name, CAN_INTERFACE);
+    if (ioctl(sock, SIOCGIFINDEX, &ifr) < 0) {
+        perror("ioctl SIOCGIFINDEX failed");
         close(sock);
         return 1;
     }
 
     memset(&addr, 0, sizeof(addr));
     addr.can_family = AF_CAN;
-    addr.can_ifindex = ifindex;
+    addr.can_ifindex = ifr.ifr_ifindex;
 
     if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         perror("CAN socket bind failed");
