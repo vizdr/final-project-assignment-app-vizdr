@@ -1,4 +1,5 @@
 // can_send_detection.c
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,7 +13,14 @@
 
 #include <linux/can.h>
 #include <linux/can/raw.h>
+#include <signal.h>
 
+static volatile sig_atomic_t g_stop = 0;
+
+static void handle_sig(int sig) {
+    (void)sig;
+    g_stop = 1;
+}
 
 #define FILE_PATH "/var/tmp/audio_detection"
 #define CAN_INTERFACE "can0"
@@ -25,6 +33,13 @@ int main()
     struct sockaddr_can addr;
     struct ifreq ifr;
     struct can_frame frame;
+    struct sigaction sa;
+
+     /* Setup signal handling */
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = handle_sig;
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
 
     // --- Open CAN socket ---
     if ((sock = socket(PF_CAN, SOCK_RAW, CAN_RAW)) < 0) {
@@ -52,7 +67,7 @@ int main()
     printf("CAN socket opened on interface %s\n", CAN_INTERFACE);
 
     // --- Main loop ---
-    while (1) {
+    while (!g_stop) {
         FILE *fp = fopen(FILE_PATH, "r");
         if (!fp) {
             perror("Error opening detection file");
