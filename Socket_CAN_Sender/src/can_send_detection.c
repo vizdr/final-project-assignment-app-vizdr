@@ -5,12 +5,12 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
-
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>   // <-- needed for ioctl()
 #include <net/if.h>      // <-- needed for struct ifreq
-
+#include <fcntl.h>
 #include <linux/can.h>
 #include <linux/can/raw.h>
 #include <signal.h>
@@ -40,6 +40,40 @@ int main()
     sa.sa_handler = handle_sig;
     sigaction(SIGINT, &sa, NULL);
     sigaction(SIGTERM, &sa, NULL);
+
+    // -------------------------------------------------------------
+    // Ensure the input file exists; if not, create it with "0"
+    // -------------------------------------------------------------
+    struct stat st;
+    if (stat(FILE_PATH, &st) == -1)
+    {
+        if (errno == ENOENT)
+        {
+            fprintf(stderr, "[INIT] INPUT_FILE not found. Creating %s with value 0...\n", FILE_PATH);
+            int fd = open(FILE_PATH, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            if (fd < 0)
+            {
+                perror("open (creating INPUT_FILE)");
+                exit(EXIT_FAILURE);
+            }
+
+            const char *init_value = "0\n";
+            if (write(fd, init_value, strlen(init_value)) != (ssize_t)strlen(init_value))
+            {
+                perror("write (initializing INPUT_FILE)");
+                close(fd);
+                exit(EXIT_FAILURE);
+            }
+
+            close(fd);
+            fprintf(stderr, "[INIT] INPUT_FILE created successfully.\n");
+        }
+        else
+        {
+            perror("stat INPUT_FILE");
+            exit(EXIT_FAILURE);
+        }
+    }
 
     // --- Open CAN socket ---
     if ((sock = socket(PF_CAN, SOCK_RAW, CAN_RAW)) < 0) {

@@ -34,7 +34,7 @@ static void handle_sig(int sig) {
 #define CAN_INTERFACE "can0"
 #define CAN_ID        0x123
 
-#define OUTPUT_FILE   "/var/tmp/can_received_value"
+#define OUTPUT_FILE   "/var/tmp/audio_detection"
 #define LOG_FILE      "/var/log/can-server.log"
 
 // Write timestamp in YYYY-MM-DD HH:MM:SS format
