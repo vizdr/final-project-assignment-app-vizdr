@@ -87,6 +87,7 @@ int main()
     // --- Open CAN socket ---
     if ((sock = socket(PF_CAN, SOCK_RAW, CAN_RAW)) < 0) {
         printf("Error while opening CAN socket\n");
+        syslog(LOG_ERR, "Error while opening CAN socket: %s", strerror(errno));
         perror("Error while opening CAN socket");
         return 1;
     }
@@ -94,6 +95,7 @@ int main()
     strcpy(ifr.ifr_name, CAN_INTERFACE);
     if (ioctl(sock, SIOCGIFINDEX, &ifr) < 0) {
         printf("Error in ioctl SIOCGIFINDEX\n");
+        syslog(LOG_ERR, "ioctl SIOCGIFINDEX failed: %s", strerror(errno));
         perror("ioctl SIOCGIFINDEX failed");
         close(sock);
         return 1;
@@ -107,6 +109,8 @@ int main()
 
     if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         perror("CAN socket bind failed");
+        syslog(LOG_ERR, "CAN socket bind failed: %s", strerror(errno));
+        printf("CAN socket bind failed\n");
         close(sock);
         return 1;
     }
