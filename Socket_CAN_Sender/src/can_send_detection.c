@@ -14,6 +14,7 @@
 #include <linux/can.h>
 #include <linux/can/raw.h>
 #include <signal.h>
+#include <syslog.h>
 
 static volatile sig_atomic_t g_stop = 0;
 
@@ -26,9 +27,10 @@ static void handle_sig(int sig) {
 #define CAN_INTERFACE "can0"
 #define CAN_ID 0x123          // CAN ID to send the detection count
 #define READ_INTERVAL_SEC 5   // Read file every 5 seconds
-
 int main()
 {
+    openlog("CAN_Detection_Sender", LOG_PID | LOG_CONS, LOG_USER);
+    syslog(LOG_INFO, "CAN Detection Sender started.");
     int sock;
     struct sockaddr_can addr;
     struct ifreq ifr;
@@ -50,23 +52,30 @@ int main()
         if (errno == ENOENT)
         {
             fprintf(stderr, "[INIT] INPUT_FILE not found. Creating %s with value 0...\n", FILE_PATH);
+            syslog(LOG_INFO, "[INIT] INPUT_FILE not found. Creating %s with value 0...", FILE_PATH);
+            printf("Input file %s not found. Creating with initial value 0.\n", FILE_PATH);
             int fd = open(FILE_PATH, O_WRONLY | O_CREAT | O_TRUNC, 0644);
             if (fd < 0)
             {
                 perror("open (creating INPUT_FILE)");
                 exit(EXIT_FAILURE);
             }
+            syslog(LOG_INFO, "[INIT] INPUT_FILE created successfully.");
+            printf("Input file %s created with initial value 0.\n", FILE_PATH);
 
             const char *init_value = "0\n";
             if (write(fd, init_value, strlen(init_value)) != (ssize_t)strlen(init_value))
             {
+                syslog(LOG_ERR, "Failed to write initial value to %s: %s", FILE_PATH, strerror(errno));
+                printf("Failed to write initial value to %s\n", FILE_PATH);
                 perror("write (initializing INPUT_FILE)");
                 close(fd);
                 exit(EXIT_FAILURE);
             }
 
             close(fd);
-            fprintf(stderr, "[INIT] INPUT_FILE created successfully.\n");
+            syslog(LOG_INFO, "[INIT] INPUT_FILE created successfully.");
+            printf("Input file %s created with initial value 0.\n", FILE_PATH);
         }
         else
         {
@@ -77,16 +86,20 @@ int main()
 
     // --- Open CAN socket ---
     if ((sock = socket(PF_CAN, SOCK_RAW, CAN_RAW)) < 0) {
+        printf("Error while opening CAN socket\n");
         perror("Error while opening CAN socket");
         return 1;
     }
 
     strcpy(ifr.ifr_name, CAN_INTERFACE);
     if (ioctl(sock, SIOCGIFINDEX, &ifr) < 0) {
+        printf("Error in ioctl SIOCGIFINDEX\n");
         perror("ioctl SIOCGIFINDEX failed");
         close(sock);
         return 1;
     }
+
+    printf("CAN socket opened on interface %s\n", CAN_INTERFACE);
 
     memset(&addr, 0, sizeof(addr));
     addr.can_family = AF_CAN;
@@ -98,20 +111,23 @@ int main()
         return 1;
     }
 
-    printf("CAN socket opened on interface %s\n", CAN_INTERFACE);
+    printf("CAN socket bound on interface %s\n", CAN_INTERFACE);
 
     // --- Main loop ---
     while (!g_stop) {
         FILE *fp = fopen(FILE_PATH, "r");
         if (!fp) {
+            syslog(LOG_ERR, "Error opening detection file %s: %s", FILE_PATH, strerror(errno));
             perror("Error opening detection file");
+            printf("Retrying in %d seconds...\n", READ_INTERVAL_SEC);
             sleep(READ_INTERVAL_SEC);
             continue;
         }
 
         int detection_count = 0;
         if (fscanf(fp, "%d", &detection_count) != 1) {
-            fprintf(stderr, "Failed to read integer from file\n");
+            printf("Failed to read integer from file %s\n", FILE_PATH);
+            syslog(LOG_ERR, "Failed to read integer from file %s", FILE_PATH);
             fclose(fp);
             sleep(READ_INTERVAL_SEC);
             continue;
@@ -125,6 +141,8 @@ int main()
 
         // --- Send CAN frame ---
         if (write(sock, &frame, sizeof(struct can_frame)) != sizeof(struct can_frame)) {
+            printf("CAN write failed\n");
+            syslog(LOG_ERR, "CAN write failed: %s", strerror(errno));
             perror("CAN write failed");
         } else {
             printf("Sent detection_count=%d over CAN ID=0x%X\n", detection_count, CAN_ID);
