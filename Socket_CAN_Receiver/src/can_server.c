@@ -23,6 +23,7 @@
 #include <linux/can.h>
 #include <linux/can/raw.h>
 #include <signal.h>
+#include <syslog.h>
 
 static volatile sig_atomic_t g_stop = 0;
 
@@ -55,6 +56,8 @@ static void write_timestamp(FILE *logf)
 
 int main()
 {
+    openlog("CAN_Receiver_Server", LOG_PID | LOG_CONS, LOG_USER);
+    syslog(LOG_INFO, "CAN Receiver started.");
     int sock;
     struct sockaddr_can addr;
     struct ifreq ifr;
@@ -70,6 +73,7 @@ int main()
     // --- Open log file ---
     FILE *logf = fopen(LOG_FILE, "a");
     if (!logf) {
+        syslog(LOG_ERR, "Failed to open log file %s: %s", LOG_FILE, strerror(errno));
         perror("Failed to open log file, logging to stdout");
         logf = stdout;  // use stdout fallback
     } else {
@@ -79,12 +83,14 @@ int main()
 
     // --- Open CAN socket ---
     if ((sock = socket(PF_CAN, SOCK_RAW, CAN_RAW)) < 0) {
+        syslog(LOG_ERR, "Error opening CAN socket: %s", strerror(errno));
         perror("Error opening CAN socket");
         return 1;
     }
 
     strcpy(ifr.ifr_name, CAN_INTERFACE);
     if (ioctl(sock, SIOCGIFINDEX, &ifr) < 0) {
+        syslog(LOG_ERR, "ioctl SIOCGIFINDEX failed: %s", strerror(errno));
         perror("ioctl failed");
         close(sock);
         return 1;
@@ -95,10 +101,15 @@ int main()
     addr.can_ifindex = ifr.ifr_ifindex;
 
     if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-        perror("bind failed");
+        syslog(LOG_ERR, "CAN socket bind failed: %s", strerror(errno));
+        perror("CAN socket bind failed");
         close(sock);
         return 1;
     }
+
+    printf("Waiting 100 ms for CAN interface to initialize...\n");
+    syslog(LOG_INFO, "Waiting 100 ms for CAN interface to initialize...");
+    usleep(100000);
 
     fprintf(logf, "Listening on %s for CAN ID 0x%X\n",
             CAN_INTERFACE, CAN_ID);
@@ -116,6 +127,7 @@ int main()
 
         if (nbytes < 0) {
             write_timestamp(logf);
+            syslog(LOG_ERR, "CAN read error: %s", strerror(errno));
             fprintf(logf, "CAN read error: %s\n", strerror(errno));
             fflush(logf);
             continue;
@@ -123,6 +135,7 @@ int main()
 
         if (nbytes < sizeof(struct can_frame)) {
             write_timestamp(logf);
+            syslog(LOG_WARNING, "Short CAN frame received");
             fprintf(logf, "Short CAN frame received\n");
             fflush(logf);
             continue;
@@ -131,6 +144,7 @@ int main()
         // Extract integer exactly as sent by sender
         if (frame.can_dlc < sizeof(int)) {
             write_timestamp(logf);
+            syslog(LOG_WARNING, "Invalid DLC %d (expected >= 4)", frame.can_dlc);
             fprintf(logf, "Invalid DLC %d (expected >= 4)\n", frame.can_dlc);
             fflush(logf);
             continue;
@@ -143,6 +157,7 @@ int main()
         FILE *fp = fopen(OUTPUT_FILE, "w+");
         if (!fp) {
             write_timestamp(logf);
+            syslog(LOG_ERR, "Error opening %s: %s", OUTPUT_FILE, strerror(errno));
             fprintf(logf, "Error writing to %s: %s\n",
                     OUTPUT_FILE, strerror(errno));
             fflush(logf);
@@ -153,12 +168,17 @@ int main()
 
         // Log the received value
         write_timestamp(logf);
+        syslog(LOG_INFO, "Received CAN ID=0x%X value=%d", frame.can_id, value);
         fprintf(logf, "Received CAN ID=0x%X value=%d\n",
                 frame.can_id, value);
         fflush(logf);
+
+        usleep(10000); // 10ms small delay to avoid busy looping
     }
 
     close(sock);
+    syslog(LOG_INFO, "CAN Receiver stopped.");
+    closelog();
 
     if (logf != stdout)
         fclose(logf);
