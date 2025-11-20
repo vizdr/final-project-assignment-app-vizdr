@@ -128,8 +128,8 @@ int main()
     }
 
     printf("CAN socket bound on interface %s\n", CAN_INTERFACE);
-
     printf("Waiting 100 ms for CAN interface to initialize...\n");
+    
     syslog(LOG_INFO, "Waiting 100 ms for CAN interface to initialize...");
     usleep(100000);
 
