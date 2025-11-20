@@ -1,11 +1,12 @@
 // can_server.c
-// Minimal CAN receiver for Raspberry Pi (Waveshare RS485 CAN HAT)
-// Compatible with your can_send_detection.c sender.
+// Simple CAN receiver for Raspberry Pi (Waveshare RS485 CAN HAT)
+// Listens on CAN interface "can0"
 //
 // - Listens on CAN ID 0x123
 // - Extracts 4-byte integer from frame.data
-// - Writes value to /var/tmp/can_received_value
+// - Writes value to /var/tmp/audio_detection
 // - Logs all received messages to /var/log/can-server.log
+
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
